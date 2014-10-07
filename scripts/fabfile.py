@@ -47,6 +47,11 @@ env.roledefs.update({'all': env.roledefs['oc'] + env.roledefs['cp'] + env.rolede
 }) 
 
 @task
+def addConsulToken():
+  """consul token """
+  sudo("mkdir -p /etc/facter/facts.d; echo consul_discovery_token=60ec3331307a4eeea06358ccfd2207e2 > /etc/facter/facts.d/consul.txt")
+
+@task
 @parallel
 def destroyCeph():
   """Rebuild ceph - all data will be lost"""
@@ -55,16 +60,20 @@ def destroyCeph():
     sudo("umount /var/lib/ceph/osd/*")
     sudo("rm -fr /var/lib/ceph/")
     sudo("mkfs.xfs -f /dev/vdb2")
+    sudo("dd if=/dev/zero of=/dev/vdb1 bs=1k count=1000000")
     sudo("parted /dev/vdb print")
     sudo("parted /dev/vdb rm 1")
     sudo("parted /dev/vdb rm 2")
     sudo("parted /dev/vdb print")
+    sudo("losetup -d /dev/loop0")
+    sudo("sed -i /loop0p2/d /etc/fstab")
+    sudo("sed -i /vdb2/d /etc/fstab")
     sudo("rm -fr /etc/ceph/")
 
 @task
 @parallel
 def buildCeph():
-    execute(runPapply,hosts=env.hosts,num_exec=5)
+    execute(runPapply,hosts=env.hosts)
 
 @task
 def copy(src,dst,run_type='run'):
@@ -86,7 +95,7 @@ def test(file):
 
 @task
 def runUserData(file,role=None,node=None):
-  """Run userdata script on the servers"""
+  """Run userdata script on the servers, arguments file, role, node"""
   if role:
     nodes = env.roledefs[role]
   elif node:
